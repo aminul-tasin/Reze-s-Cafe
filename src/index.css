@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Rubik+Glitch&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Playfair Display", serif;
+  --font-distorted: "Rubik Glitch", system-ui;
+  --color-deep-purple: #2D0B5A;
+  --color-lavender: #E6E6FA;
+  --color-neon-pink: #FF00FF;
+  --color-electric-blue: #00FFFF;
+}
+
+.cafe-texture {
+  background-image: url("https://www.transparenttextures.com/patterns/vintage-speckles.png"), 
+                    linear-gradient(rgba(45, 11, 90, 0.9), rgba(45, 11, 90, 0.95)),
+                    url("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1920&auto=format&fit=crop");
+  background-size: auto, cover, cover;
+  background-attachment: fixed;
+}
+
+@keyframes spark {
+  0% { transform: scale(0); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.spark-particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: var(--color-neon-pink);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: spark 0.4s ease-out forwards;
+}
