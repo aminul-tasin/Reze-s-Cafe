@@ -17,11 +17,6 @@ const stripe = (stripeKey && stripeKey.length > 5) ? new Stripe(stripeKey) : nul
 
 const supabaseUrl = process.env.SUPABASE_URL || "https://yxavodckxdpyaezxegii.supabase.co";
 const supabaseKey = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4YXZvZGNreGRweWFlenhlZ2lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NDU5MDQsImV4cCI6MjA4ODIyMTkwNH0.mDaCU6KpyOOTelDNofEefeCH5_OC5vQtRfl6-7oOnpU";
-
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
-  console.warn("WARNING: SUPABASE_URL or SUPABASE_ANON_KEY is missing from environment variables. Using hardcoded fallbacks.");
-}
-
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Initial data
@@ -553,41 +548,22 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+  if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    // In production (like Vercel), the frontend is served as static files
-    // or handled by Vercel's own routing.
     app.use(express.static(path.join(__dirname, "dist")));
-    // For SPA routing, serve index.html for all non-API routes
     app.get("*", (req, res) => {
-      const indexPath = path.join(__dirname, "dist", "index.html");
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        // Fallback for Vercel if dist isn't available in the same container
-        res.status(404).send("Frontend not found. Make sure to run 'npm run build' first.");
-      }
+      res.sendFile(path.join(__dirname, "dist", "index.html"));
     });
   }
 
-  // Only start the server if we're not in a serverless environment (like Vercel)
-  if (!process.env.VERCEL) {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }
-
-  return app;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
 }
 
-// Export the app for Vercel
-export const appPromise = startServer();
-export default async (req: any, res: any) => {
-  const app = await appPromise;
-  return app(req, res);
-};
+startServer();
