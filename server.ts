@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -12,11 +11,11 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const stripeKey = process.env.STRIPE_SECRET_KEY;
+const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.VITE_STRIPE_SECRET_KEY;
 const stripe = (stripeKey && stripeKey.length > 5) ? new Stripe(stripeKey) : null;
 
-const supabaseUrl = process.env.SUPABASE_URL || "https://yxavodckxdpyaezxegii.supabase.co";
-const supabaseKey = process.env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4YXZvZGNreGRweWFlenhlZ2lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NDU5MDQsImV4cCI6MjA4ODIyMTkwNH0.mDaCU6KpyOOTelDNofEefeCH5_OC5vQtRfl6-7oOnpU";
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://yxavodckxdpyaezxegii.supabase.co";
+const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4YXZvZGNreGRweWFlenhlZ2lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NDU5MDQsImV4cCI6MjA4ODIyMTkwNH0.mDaCU6KpyOOTelDNofEefeCH5_OC5vQtRfl6-7oOnpU";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Initial data
@@ -552,18 +551,18 @@ export async function createServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, "dist");
+    // In production/Vercel, static files are handled by Vercel's edge
+    // But we keep this as a fallback for other environments
+    const distPath = path.join(process.cwd(), "dist");
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
-      app.get("*", (req, res) => {
-        res.sendFile(path.join(distPath, "index.html"));
-      });
     }
   }
 
