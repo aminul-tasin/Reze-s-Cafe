@@ -18,14 +18,7 @@ const stripe = (stripeKey && stripeKey.length > 5) ? new Stripe(stripeKey) : nul
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.VITE_SUPERBASE_URL || "https://yxavodckxdpyaezxegii.supabase.co";
 const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPERBASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4YXZvZGNreGRweWFlenhlZ2lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NDU5MDQsImV4cCI6MjA4ODIyMTkwNH0.mDaCU6KpyOOTelDNofEefeCH5_OC5vQtRfl6-7oOnpU";
 
-console.log("Initializing Supabase with URL:", supabaseUrl);
-if (!supabaseUrl || supabaseUrl.includes("yxavodckxdpyaezxegii")) {
-  console.warn("WARNING: Using default Supabase URL. Ensure your environment variables are set correctly in Vercel.");
-}
-if (!supabaseKey || supabaseKey.length < 50) {
-  console.error("ERROR: Supabase Anon Key is missing or invalid!");
-}
-const supabase = createClient(supabaseUrl, supabaseKey);
+let supabase: any;
 
 // Initial data
 const initialProducts = [
@@ -131,11 +124,30 @@ async function seedDatabase() {
 }
 
 export async function createServer() {
+  console.log("createServer() started");
   const app = express();
   const PORT = process.env.PORT || 3000;
 
-  // Run seeding in background
-  seedDatabase();
+  try {
+    // Initialize Supabase lazily
+    if (!supabase) {
+      console.log("Initializing Supabase with URL:", supabaseUrl);
+      if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
+        throw new Error(`Invalid Supabase URL: ${supabaseUrl}`);
+      }
+      if (!supabaseKey || supabaseKey.length < 20) {
+        throw new Error("Invalid Supabase Key");
+      }
+      supabase = createClient(supabaseUrl, supabaseKey);
+      console.log("Supabase client created successfully");
+    }
+
+    // Run seeding in background
+    seedDatabase().catch(err => console.error("Background seeding failed:", err));
+  } catch (err: any) {
+    console.error("Error during server initialization:", err);
+    throw err;
+  }
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -560,6 +572,16 @@ export async function createServer() {
     res.json({ success: true });
   });
 
+  // Global error handler (should be last)
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Global error handler caught:", err);
+    res.status(500).json({ 
+      error: "Internal Server Error", 
+      message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  });
+
   // User Profile Endpoints
   app.get("/api/user/profile", async (req, res) => {
     const { email } = req.query;
@@ -602,9 +624,8 @@ export async function createServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
-    // In production/Vercel, static files are handled by Vercel's edge
-    // But we keep this as a fallback for other environments
+  } else if (process.env.VERCEL !== "1") {
+    // Only serve static files if NOT on Vercel (Vercel handles this via rewrites/static build)
     const distPath = path.join(process.cwd(), "dist");
     if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));

@@ -1201,13 +1201,21 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseErr) {
+          const text = await res.text();
+          console.error("Failed to parse JSON response:", text);
+          throw new Error(`Server returned non-JSON response: ${text.substring(0, 50)}...`);
+        }
+        
         if (data.success) {
           localStorage.setItem('adminToken', data.token);
           setIsAdmin(true);
           navigate('/admin');
         } else {
-          setError(data.message || "Access Denied");
+          setError(data.message || data.error || "Access Denied");
         }
       } catch (err: any) {
         console.error("Admin login error:", err);
@@ -1277,7 +1285,15 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password, name })
         });
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseErr) {
+          const text = await res.text();
+          console.error("Failed to parse JSON response:", text);
+          throw new Error(`Server returned non-JSON response: ${text.substring(0, 50)}...`);
+        }
+
         if (res.ok) {
           if (isLogin) {
             localStorage.setItem('user', JSON.stringify(data.user));
