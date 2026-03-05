@@ -1,152 +1,45 @@
 import express from "express";
 import { createClient } from "@supabase/supabase-js";
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
 import Stripe from "stripe";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.VITE_STRIPE_SECRET_KEY;
-const stripe = (stripeKey && stripeKey.length > 5) ? new Stripe(stripeKey) : null;
+import path from "path";
+import fs from "fs";
 
 // Handle potential typo in user's env vars (SUPERBASE instead of SUPABASE)
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.VITE_SUPERBASE_URL || "https://yxavodckxdpyaezxegii.supabase.co";
-const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPERBASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4YXZvZGNreGRweWFlenhlZ2lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NDU5MDQsImV4cCI6MjA4ODIyMTkwNH0.mDaCU6KpyOOTelDNofEefeCH5_OC5vQtRfl6-7oOnpU";
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://yxavodckxdpyaezxegii.supabase.co";
+const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4YXZvZGNreGRweWFlenhlZ2lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NDU5MDQsImV4cCI6MjA4ODIyMTkwNH0.mDaCU6KpyOOTelDNofEefeCH5_OC5vQtRfl6-7oOnpU";
 
 let supabase: any;
+let stripe: any;
 
-// Initial data
-const initialProducts = [
-  { 
-    name: "Bomb Devil Reze Figure", 
-    price: 189.99, 
-    image: "https://images.unsplash.com/photo-1559535332-db9971090158?q=80&w=800&auto=format&fit=crop",
-    description: "Highly detailed 1/7 scale figure of Reze in her Bomb Devil form. Features translucent explosion effects and a dynamic pose. Crafted with premium PVC materials to capture every detail of the hybrid form.",
-    category: "Figures",
-    features: JSON.stringify(["1/7 Scale", "Premium PVC", "Collector's Box", "Limited Edition"]),
-    quantity: 15
-  },
-  { 
-    name: "Pochita Plushie (Large)", 
-    price: 45.00, 
-    image: "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?q=80&w=800&auto=format&fit=crop",
-    description: "Soft, huggable, and absolutely adorable. This large Pochita plushie features the iconic chainsaw head and tail. Perfect for cuddling or displaying on your shelf.",
-    category: "Plushies",
-    features: JSON.stringify(["Super Soft Fabric", "40cm Length", "Embroidered Details", "Official Licensed Design"]),
-    quantity: 50
-  },
-  { 
-    name: "Devil Hunter Trench Coat", 
-    price: 150.00, 
-    image: "https://images.unsplash.com/photo-1544022613-e87ca75a784a?q=80&w=800&auto=format&fit=crop",
-    description: "The classic uniform of the Public Safety Devil Hunters. Made from high-quality, durable fabric with a sleek black finish. Perfect for cosplay or everyday stylish wear.",
-    category: "Apparel",
-    features: JSON.stringify(["Durable Cotton Blend", "Internal Pockets", "Accurate Design", "Unisex Fit"]),
-    quantity: 20
-  },
-  { 
-    name: "Chainsaw Man Manga Vol. 1-11", 
-    price: 99.00, 
-    image: "https://images.unsplash.com/photo-1614332287897-cdc485fa562d?q=80&w=800&auto=format&fit=crop",
-    description: "Experience the complete first part of Tatsuki Fujimoto's masterpiece. This box set includes volumes 1 through 11, following Denji's journey from a debt-ridden boy to the legendary Chainsaw Man.",
-    category: "Manga",
-    features: JSON.stringify(["Complete Part 1", "Exclusive Box Art", "English Translation", "High-Quality Print"]),
-    quantity: 30
-  },
-  { 
-    name: "Makima 'Control' Enamel Pin", 
-    price: 12.50, 
-    image: "https://images.unsplash.com/photo-1590247813693-5541d1c609fd?q=80&w=800&auto=format&fit=crop",
-    description: "A subtle yet powerful accessory. This high-quality enamel pin features Makima's hypnotic eyes and the symbol of the Control Devil. Perfect for jackets, bags, or hats.",
-    category: "Accessories",
-    features: JSON.stringify(["Hard Enamel", "Double Rubber Clutch", "Gold Plating", "2-inch Diameter"]),
-    quantity: 100
-  },
-  { 
-    name: "Power's Blood Scythe Prop", 
-    price: 75.00, 
-    image: "https://images.unsplash.com/photo-1589709130696-49231935d217?q=80&w=800&auto=format&fit=crop",
-    description: "A lightweight yet sturdy replica of Power's iconic blood-manifested scythe. Perfect for cosplay or as a striking wall display for any fan of the Blood Fiend.",
-    category: "Props",
-    features: JSON.stringify(["High-Density Foam", "Hand-Painted Finish", "Detachable Handle", "Safe for Conventions"]),
-    quantity: 10
-  },
-  { 
-    name: "Aki Hayakawa's Katana", 
-    price: 210.00, 
-    image: "https://images.unsplash.com/photo-1530325553241-4f6e7690cf36?q=80&w=800&auto=format&fit=crop",
-    description: "A premium replica of Aki's sword, including the nail-shaped hilt used for his contract with the Curse Devil. Features a high-carbon steel blade (unsharpened) and a detailed scabbard.",
-    category: "Props",
-    features: JSON.stringify(["Carbon Steel Blade", "Nail-Shaped Hilt", "Traditional Wrap", "Display Stand Included"]),
-    quantity: 5
-  },
-  { 
-    name: "Public Safety Logo Hoodie", 
-    price: 65.00, 
-    image: "https://images.unsplash.com/photo-1556821840-3a63f95609a7?q=80&w=800&auto=format&fit=crop",
-    description: "Stay warm while hunting devils. This heavy-weight hoodie features the Public Safety Devil Hunters logo on the chest and back. Comfortable, stylish, and durable.",
-    category: "Apparel",
-    features: JSON.stringify(["Heavyweight Fleece", "Screen-Printed Logo", "Kangaroo Pocket", "Pre-Shrunk"]),
-    quantity: 40
-  },
-];
-
-async function seedDatabase() {
-  try {
-    console.log("Checking if database needs seeding...");
-    const { count, error } = await supabase.from("products").select("*", { count: 'exact', head: true });
-    
-    if (error) {
-      console.error("Error checking products count:", error.message);
-      return;
+function getStripe() {
+  if (!stripe) {
+    const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.VITE_STRIPE_SECRET_KEY;
+    if (stripeKey && stripeKey.length > 5) {
+      stripe = new Stripe(stripeKey);
     }
-    
-    if (count === 0) {
-      console.log("Seeding database with initial products...");
-      const productsToInsert = initialProducts.map(p => ({
-        ...p,
-        features: JSON.parse(p.features)
-      }));
-      const { error: insertError } = await supabase.from("products").insert(productsToInsert);
-      if (insertError) console.error("Error seeding products:", insertError.message);
-      else console.log("Database seeded successfully");
-    } else {
-      console.log(`Database already has ${count} products.`);
-    }
-  } catch (err: any) {
-    console.error("Seed database exception:", err.message);
   }
+  return stripe;
 }
 
 export async function createServer() {
   console.log("createServer() started");
   const app = express();
-  const PORT = process.env.PORT || 3000;
 
   try {
     // Initialize Supabase lazily
     if (!supabase) {
-      console.log("Initializing Supabase with URL:", supabaseUrl);
+      console.log("Initializing Supabase...");
       if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
-        throw new Error(`Invalid Supabase URL: ${supabaseUrl}`);
+        throw new Error("Invalid or missing SUPABASE_URL");
       }
-      if (!supabaseKey || supabaseKey.length < 20) {
-        throw new Error("Invalid Supabase Key");
+      if (!supabaseKey || supabaseKey.length < 10) {
+        throw new Error("Invalid or missing SUPABASE_ANON_KEY");
       }
       supabase = createClient(supabaseUrl, supabaseKey);
-      console.log("Supabase client created successfully");
+      console.log("Supabase client initialized");
     }
-
-    // Run seeding in background
-    seedDatabase().catch(err => console.error("Background seeding failed:", err));
   } catch (err: any) {
-    console.error("Error during server initialization:", err);
-    throw err;
+    console.error("Critical: Supabase initialization failed:", err.message);
   }
 
   app.use(express.json({ limit: '50mb' }));
@@ -201,7 +94,8 @@ export async function createServer() {
         return res.json({ success: true, message: "Order placed successfully" });
       }
 
-      if (!stripe) {
+      const stripeInstance = getStripe();
+      if (!stripeInstance) {
         // Fallback if Stripe is not configured (for demo purposes)
         const { error } = await supabase.from("orders").insert({
           total,
@@ -216,7 +110,7 @@ export async function createServer() {
       }
 
       // Create Stripe Checkout Session
-      const session = await stripe.checkout.sessions.create({
+      const session = await stripeInstance.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: items.map((item: any) => ({
           price_data: {
@@ -256,9 +150,10 @@ export async function createServer() {
   app.post("/api/checkout/success", async (req, res) => {
     try {
       const { sessionId } = req.body;
-      if (!stripe) return res.status(400).json({ error: "Stripe not configured" });
+      const stripeInstance = getStripe();
+      if (!stripeInstance) return res.status(400).json({ error: "Stripe not configured" });
 
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const session = await stripeInstance.checkout.sessions.retrieve(sessionId);
       if (session.payment_status === 'paid') {
         const email = session.customer_email || session.customer_details?.email || 'Guest';
         const total = parseFloat(session.metadata?.total || "0");

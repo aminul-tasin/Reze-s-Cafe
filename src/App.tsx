@@ -624,6 +624,10 @@ export default function App() {
       } catch (parseErr) {
         console.error("Failed to parse products JSON:", text);
         setProducts([]);
+        // If it's a server error, we might want to show it
+        if (text.includes("SERVER_INITIALIZATION_FAILED") || text.includes("FUNCTION_INVOCATION_FAILED")) {
+          console.error("Server configuration error. Please check backend logs.");
+        }
         return;
       }
       

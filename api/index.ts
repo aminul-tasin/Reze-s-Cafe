@@ -29,7 +29,7 @@ export default async (req: any, res: any) => {
       error: "SERVER_INITIALIZATION_FAILED", 
       message: err.message,
       stack: err.stack,
-      hint: "Check your Supabase URL and Key in Vercel Environment Variables."
+      hint: "Please check your Vercel Environment Variables (SUPABASE_URL, SUPABASE_ANON_KEY). Ensure they are correct and redeploy."
     });
   }
 };
