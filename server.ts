@@ -14,8 +14,17 @@ const __dirname = path.dirname(__filename);
 const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.VITE_STRIPE_SECRET_KEY;
 const stripe = (stripeKey && stripeKey.length > 5) ? new Stripe(stripeKey) : null;
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://yxavodckxdpyaezxegii.supabase.co";
-const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4YXZvZGNreGRweWFlenhlZ2lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NDU5MDQsImV4cCI6MjA4ODIyMTkwNH0.mDaCU6KpyOOTelDNofEefeCH5_OC5vQtRfl6-7oOnpU";
+// Handle potential typo in user's env vars (SUPERBASE instead of SUPABASE)
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.VITE_SUPERBASE_URL || "https://yxavodckxdpyaezxegii.supabase.co";
+const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPERBASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4YXZvZGNreGRweWFlenhlZ2lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2NDU5MDQsImV4cCI6MjA4ODIyMTkwNH0.mDaCU6KpyOOTelDNofEefeCH5_OC5vQtRfl6-7oOnpU";
+
+console.log("Initializing Supabase with URL:", supabaseUrl);
+if (!supabaseUrl || supabaseUrl.includes("yxavodckxdpyaezxegii")) {
+  console.warn("WARNING: Using default Supabase URL. Ensure your environment variables are set correctly in Vercel.");
+}
+if (!supabaseKey || supabaseKey.length < 50) {
+  console.error("ERROR: Supabase Anon Key is missing or invalid!");
+}
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Initial data
@@ -95,40 +104,69 @@ const initialProducts = [
 ];
 
 async function seedDatabase() {
-  const { data: products, error } = await supabase.from("products").select("count", { count: "exact", head: true });
-  if (!error && products === null) {
-    // This might happen if table doesn't exist or is empty. 
-    // In Supabase, we expect tables to exist.
-  }
-  
-  const { count } = await supabase.from("products").select("*", { count: 'exact', head: true });
-  
-  if (count === 0) {
-    const productsToInsert = initialProducts.map(p => ({
-      ...p,
-      features: JSON.parse(p.features)
-    }));
-    await supabase.from("products").insert(productsToInsert);
+  try {
+    console.log("Checking if database needs seeding...");
+    const { count, error } = await supabase.from("products").select("*", { count: 'exact', head: true });
+    
+    if (error) {
+      console.error("Error checking products count:", error.message);
+      return;
+    }
+    
+    if (count === 0) {
+      console.log("Seeding database with initial products...");
+      const productsToInsert = initialProducts.map(p => ({
+        ...p,
+        features: JSON.parse(p.features)
+      }));
+      const { error: insertError } = await supabase.from("products").insert(productsToInsert);
+      if (insertError) console.error("Error seeding products:", insertError.message);
+      else console.log("Database seeded successfully");
+    } else {
+      console.log(`Database already has ${count} products.`);
+    }
+  } catch (err: any) {
+    console.error("Seed database exception:", err.message);
   }
 }
-
-seedDatabase();
 
 export async function createServer() {
   const app = express();
   const PORT = process.env.PORT || 3000;
 
+  // Run seeding in background
+  seedDatabase();
+
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+  // Request logging middleware
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+  });
+
   // API Routes
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", environment: process.env.NODE_ENV });
+    res.json({ 
+      status: "ok", 
+      environment: process.env.NODE_ENV,
+      vercel: process.env.VERCEL,
+      supabaseUrl: supabaseUrl.substring(0, 15) + "..."
+    });
   });
   app.get("/api/products", async (req, res) => {
-    const { data: products, error } = await supabase.from("products").select("*");
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(products);
+    try {
+      const { data: products, error } = await supabase.from("products").select("*");
+      if (error) {
+        console.error("Supabase error fetching products:", error.message);
+        return res.status(500).json({ error: error.message });
+      }
+      res.json(products);
+    } catch (err: any) {
+      console.error("Products fetch exception:", err.message);
+      res.status(500).json({ error: "Internal server error fetching products" });
+    }
   });
 
   app.post("/api/checkout", async (req, res) => {
@@ -286,31 +324,38 @@ export async function createServer() {
 
   app.post("/api/auth/customer-login", async (req, res) => {
     const { email, password } = req.body;
+    console.log("Login attempt for:", email);
     
-    // Sign in using Supabase Auth
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      // Sign in using Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      return res.status(401).json({ error: error.message });
+      if (error) {
+        console.error("Supabase Auth Error:", error.message);
+        return res.status(401).json({ error: error.message });
+      }
+
+      // Fetch additional profile data from our public.users table
+      const { data: profile } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email)
+        .maybeSingle();
+
+      res.json({ 
+        success: true, 
+        user: { 
+          email: data.user.email, 
+          name: profile?.name || data.user.user_metadata?.name || 'User' 
+        } 
+      });
+    } catch (err: any) {
+      console.error("Login exception:", err.message);
+      res.status(500).json({ error: "Internal server error during login" });
     }
-
-    // Fetch additional profile data from our public.users table
-    const { data: profile } = await supabase
-      .from("users")
-      .select("*")
-      .eq("email", email)
-      .maybeSingle();
-
-    res.json({ 
-      success: true, 
-      user: { 
-        email: data.user.email, 
-        name: profile?.name || data.user.user_metadata?.name || 'User' 
-      } 
-    });
   });
 
   app.get("/api/customer/orders", async (req, res) => {

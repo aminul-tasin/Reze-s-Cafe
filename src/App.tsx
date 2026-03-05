@@ -1209,8 +1209,9 @@ export default function App() {
         } else {
           setError(data.message || "Access Denied");
         }
-      } catch (err) {
-        setError("Login failed. Try again.");
+      } catch (err: any) {
+        console.error("Admin login error:", err);
+        setError(`Connection error: ${err.message || 'Please try again'}`);
       }
     };
 
@@ -1287,10 +1288,11 @@ export default function App() {
             alert("Signup successful! Please login.");
           }
         } else {
-          setError(data.error || 'Authentication failed');
+          setError(data.error || data.message || 'Authentication failed');
         }
-      } catch (err) {
-        setError("An error occurred. Please try again.");
+      } catch (err: any) {
+        console.error("Login fetch error:", err);
+        setError(`Connection error: ${err.message || 'Please try again'}`);
       }
     };
 
