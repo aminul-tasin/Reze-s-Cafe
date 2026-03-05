@@ -3,21 +3,32 @@ import { createServer } from '../server';
 let cachedApp: any = null;
 
 export default async (req: any, res: any) => {
+  console.log(`Incoming request: ${req.method} ${req.url}`);
+  
   if (req.url === '/api/test') {
-    return res.json({ message: "API is working" });
+    return res.json({ 
+      message: "API is working", 
+      env: process.env.NODE_ENV,
+      vercel: process.env.VERCEL,
+      timestamp: new Date().toISOString()
+    });
   }
-  if (!cachedApp) {
-    console.log("Creating new server instance in Vercel...");
-    try {
+
+  try {
+    if (!cachedApp) {
+      console.log("Creating new server instance...");
       cachedApp = await createServer();
-    } catch (err: any) {
-      console.error("Failed to create server:", err.message);
-      return res.status(500).json({ 
-        error: "A SERVER ERROR OCCURRED", 
-        message: err.message,
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-      });
+      console.log("Server instance created successfully");
     }
+    
+    // Express app is a function (req, res) => void
+    return cachedApp(req, res);
+  } catch (err: any) {
+    console.error("Vercel Function Error:", err);
+    return res.status(500).json({ 
+      error: "FUNCTION_INVOCATION_FAILED", 
+      message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
-  return cachedApp(req, res);
 };

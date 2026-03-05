@@ -635,8 +635,8 @@ export async function createServer() {
   return app;
 }
 
-// Only start the server if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}` || process.env.NODE_ENV === 'development') {
+// Only start the server if this file is run directly and not on Vercel
+if (process.env.VERCEL !== "1" && (import.meta.url === `file://${process.argv[1]}` || process.env.NODE_ENV === 'development')) {
   createServer().then(app => {
     const PORT = parseInt(process.env.PORT || "3000", 10);
     app.listen(PORT, "0.0.0.0", () => {
