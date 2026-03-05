@@ -339,29 +339,28 @@ export async function createServer() {
     console.log("Login attempt for:", email);
     
     try {
-      // Sign in using Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error("Supabase Auth Error:", error.message);
-        return res.status(401).json({ error: error.message });
-      }
-
-      // Fetch additional profile data from our public.users table
-      const { data: profile } = await supabase
+      // Check public.users table directly since user is managing their own table
+      const { data: user, error } = await supabase
         .from("users")
         .select("*")
         .eq("email", email)
+        .eq("password", password) // Note: In production, passwords should be hashed
         .maybeSingle();
+
+      if (error) {
+        console.error("Database Error:", error.message);
+        return res.status(500).json({ error: "Database error" });
+      }
+
+      if (!user) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
 
       res.json({ 
         success: true, 
         user: { 
-          email: data.user.email, 
-          name: profile?.name || data.user.user_metadata?.name || 'User' 
+          email: user.email, 
+          name: user.name || 'User' 
         } 
       });
     } catch (err: any) {
@@ -462,34 +461,37 @@ export async function createServer() {
   app.post("/api/auth/login", async (req, res) => {
     const { email, password } = req.body;
     try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (authError) {
-        return res.status(401).json({ success: false, message: authError.message });
-      }
-
-      const { data: user, error: dbError } = await supabase
+      // Check public.users table directly
+      const { data: user, error } = await supabase
         .from("users")
         .select("*")
         .eq("email", email)
-        .eq("is_admin", 1)
+        .eq("password", password)
         .maybeSingle();
 
-      if (user && !dbError) {
-        // Return a more secure session-based response
+      if (error) {
+        return res.status(500).json({ success: false, message: "Database error" });
+      }
+
+      if (!user) {
+        return res.status(401).json({ success: false, message: "Invalid credentials" });
+      }
+
+      // Check if admin (hardcoded check since is_admin column is missing in screenshot)
+      const isAdmin = user.email === "asmaminultasin@gmail.com" || user.is_admin === 1 || user.is_admin === true;
+
+      if (isAdmin) {
         res.json({ 
           success: true, 
           adminEmail: email,
           token: Buffer.from(email + ":admin").toString('base64') 
         });
       } else {
-        res.status(401).json({ success: false, message: "Access denied: You are not an admin." });
+        res.status(403).json({ success: false, message: "Access denied: You are not an admin." });
       }
-    } catch (error) {
-      res.status(500).json({ success: false, message: "Login error" });
+    } catch (err: any) {
+      console.error("Admin login exception:", err.message);
+      res.status(500).json({ success: false, message: "Internal server error" });
     }
   });
 
