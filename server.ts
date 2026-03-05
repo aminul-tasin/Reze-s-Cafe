@@ -470,6 +470,7 @@ export async function createServer() {
         .maybeSingle();
 
       if (error) {
+        console.error("Admin Login DB Error:", error.message);
         return res.status(500).json({ success: false, message: "Database error" });
       }
 
@@ -477,8 +478,8 @@ export async function createServer() {
         return res.status(401).json({ success: false, message: "Invalid credentials" });
       }
 
-      // Check if admin (hardcoded check since is_admin column is missing in screenshot)
-      const isAdmin = user.email === "asmaminultasin@gmail.com" || user.is_admin === 1 || user.is_admin === true;
+      // Check if admin (is_admin is int8 in Supabase, so 1 means true)
+      const isAdmin = user.is_admin == 1 || user.is_admin === true || user.email === "asmaminultasin@gmail.com";
 
       if (isAdmin) {
         res.json({ 

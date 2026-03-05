@@ -26,9 +26,10 @@ export default async (req: any, res: any) => {
   } catch (err: any) {
     console.error("Vercel Function Error:", err);
     return res.status(500).json({ 
-      error: "FUNCTION_INVOCATION_FAILED", 
+      error: "SERVER_INITIALIZATION_FAILED", 
       message: err.message,
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      stack: err.stack,
+      hint: "Check your Supabase URL and Key in Vercel Environment Variables."
     });
   }
 };

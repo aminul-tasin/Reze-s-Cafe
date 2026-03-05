@@ -617,7 +617,16 @@ export default function App() {
   const fetchProducts = async () => {
     try {
       const res = await fetch('/api/products');
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        console.error("Failed to parse products JSON:", text);
+        setProducts([]);
+        return;
+      }
+      
       if (Array.isArray(data)) {
         setProducts(data);
       } else {
