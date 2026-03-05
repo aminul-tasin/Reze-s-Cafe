@@ -1201,11 +1201,11 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
+        const text = await res.text();
         let data;
         try {
-          data = await res.json();
+          data = JSON.parse(text);
         } catch (parseErr) {
-          const text = await res.text();
           console.error("Failed to parse JSON response:", text);
           throw new Error(`Server returned non-JSON response: ${text.substring(0, 50)}...`);
         }
@@ -1285,11 +1285,11 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password, name })
         });
+        const text = await res.text();
         let data;
         try {
-          data = await res.json();
+          data = JSON.parse(text);
         } catch (parseErr) {
-          const text = await res.text();
           console.error("Failed to parse JSON response:", text);
           throw new Error(`Server returned non-JSON response: ${text.substring(0, 50)}...`);
         }
